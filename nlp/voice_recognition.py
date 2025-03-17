@@ -5,12 +5,9 @@ from pydub import AudioSegment
 from telegram import Update
 from telegram.ext import CallbackContext
 
-
+#Конвертирует аудиофайл из формата OGG в WAV и распознает речь. Возвращает распознанный текст или пустую строку в случае ошибки.
 def transcribe_audio(file_path: str) -> str:
-    """
-    Конвертирует аудиофайл из формата OGG в WAV и распознает речь.
-    Возвращает распознанный текст или пустую строку в случае ошибки.
-    """
+
     try:
         # Загрузка аудиофайла из формата OGG
         audio = AudioSegment.from_file(file_path, format="ogg")
@@ -38,12 +35,9 @@ def transcribe_audio(file_path: str) -> str:
     os.remove(wav_path)  # Удаляем временный WAV файл
     return text
 
-
+#Загружает голосовое сообщение из Telegram, сохраняет его во временный файл, распознает речь и возвращает полученный текст
 def process_voice_message(update: Update, context: CallbackContext) -> str:
-    """
-    Загружает голосовое сообщение из Telegram, сохраняет его во временный файл,
-    распознает речь и возвращает полученный текст.
-    """
+
     voice = update.message.voice
     file = voice.get_file()
 
