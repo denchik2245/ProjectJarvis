@@ -4,7 +4,7 @@ API_KEY = 'YOUR_YANDEX_WEATHER_API_KEY'  # API-ключ. Пример: "demo_yan
 BASE_URL = 'https://api.weather.yandex.ru/v2/'
 
 # Координаты Москвы
-city = {'lat': 55.7558, 'lon': 37.6173}
+City = {'city': 'Москва', 'lat': 55.7558, 'lon': 37.6173}
 
 cities = [
     {'city': 'Москва', 'lat': '55.7558', 'lon': '37.6173'},
@@ -31,17 +31,21 @@ cities = [
 ]
 
 # возможно, стоит заставить нейронного агента искать координаты городов? Или просто это делать "этажом выше"
-def change_coordinates(city):
-    coordinate = cities['city': city] # // Выбор города из массива 
-    if coordinate:
-        city = {'lat': coordinate['lat'], 'lon':coordinate['lon']}
-        return {coordinate}
+def change_city(newcity):
+    coordinate = None
+    for c in cities:
+        if c.get('city') == newcity : 
+            coordinate = c
+    if coordinate is not None:
+        global City
+        City = coordinate
+        return {'city': coordinate['city'],'lat': coordinate['lat'], 'lon':coordinate['lon']}
     else:
-        raise Exception(f'Error: {city} не имеется в реестре городов.')
+        raise Exception(f'Error: {newcity} не имеется в реестре городов.')
 
 def change_coordinates(lat, lon): # {} <-- Нуну, скобочки, ага
     city = {'lat': lat, 'lon': lon}
-    return {city}
+    return city
     
 def get_current_weather(city):
     """Получить текущую погоду для указанного города."""
