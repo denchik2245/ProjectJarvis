@@ -31,7 +31,7 @@ cities = [
 ]
 
 # возможно, стоит заставить нейронного агента искать координаты городов? Или просто это делать "этажом выше"
-def change_city(newcity):
+def set_city(newcity):
     coordinate = None
     for c in cities:
         if c.get('city') == newcity : 
@@ -43,21 +43,26 @@ def change_city(newcity):
     else:
         raise Exception(f'Error: {newcity} не имеется в реестре городов.')
 
+def get_city():
+    return City
+
 def change_coordinates(lat, lon): # {} <-- Нуну, скобочки, ага
-    city = {'lat': lat, 'lon': lon}
-    return city
+    global City
+    City = {'city': '', 'lat': lat, 'lon': lon}
+    return City
     
-def get_current_weather(city):
-    """Получить текущую погоду для указанного города."""
+def get_current_weather():
+    f"""Получить текущую погоду в городе {City['city']}."""
     headers = {
         'X-Yandex-API-Key': API_KEY
     }
-    response = requests.get(f'{BASE_URL}informers?lat={city["lat"]}&lon={city["lon"]}', headers=headers)
+    response = requests.get(f'{BASE_URL}informers?lat={City["lat"]}&lon={City["lon"]}', headers=headers)
     
     if response.status_code == 200:
         weather_data = response.json()
-        return {
+        return { # https://yandex.ru/dev/weather/doc/ru/concepts/forecast-rest
             'temperature': weather_data['fact']['temp'],
+            'feels_like': weather_data['fact']['feels_like'],
             'condition': weather_data['fact']['condition'],
             'wind_speed': weather_data['fact']['wind_speed'],
             'humidity': weather_data['fact']['humidity']
@@ -65,12 +70,12 @@ def get_current_weather(city):
     else:
         raise Exception(f'Error: {response.status_code}') # Возможно, я неправтльно юзаю эту конструкцию
 
-def get_weather_forecast(city, days=1):
+def get_weather_forecast(days):
     """Получить прогноз погоды на указанные дни (1 или 7)."""
     headers = {
         'X-Yandex-API-Key': API_KEY
     }
-    response = requests.get(f'{BASE_URL}forecast?lat={city["lat"]}&lon={city["lon"]}&days={days}', headers=headers)
+    response = requests.get(f'{BASE_URL}forecast?lat={City["lat"]}&lon={City["lon"]}&days={days}', headers=headers)
     
     if response.status_code == 200:
         forecast_data = response.json()
