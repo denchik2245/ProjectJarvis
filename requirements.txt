@@ -5,3 +5,4 @@ google-auth==2.17.3
 google-auth-oauthlib==0.5.2
 SpeechRecognition==3.8.1
 pydub==0.25.1
+gkeepapi==0.11.7
