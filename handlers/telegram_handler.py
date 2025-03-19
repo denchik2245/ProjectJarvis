@@ -3,6 +3,9 @@ from telegram.ext import CallbackContext
 from datetime import datetime, timedelta, date
 import dateparser
 
+from nlp.command_parser import handle_voice_command
+
+
 #Команда /start
 def start(update: Update, context: CallbackContext) -> None:
     user_first_name = update.effective_user.first_name if update.effective_user.first_name else "Пользователь"
@@ -425,17 +428,17 @@ def cancelevent_command(update: Update, context: CallbackContext) -> None:
     except Exception as e:
         update.message.reply_text(f"Ошибка при отмене события: {e}")
 
-#Голосовое сообщение или любое сообщение не команда
+# Обработка обычных текстовых сообщений
+def handle_text_message(update: Update, context: CallbackContext) -> None:
+    update.message.reply_text(
+        "Функционал пока не реализован для произвольных сообщений. "
+        "Используйте команды /start, /help и т.д."
+    )
+
+# Обработка входящих сообщений: голосовых и текстовых
 def handle_message(update: Update, context: CallbackContext) -> None:
     if update.message.voice:
-        from nlp.voice_recognition import process_voice_message
-        recognized_text = process_voice_message(update, context)
-        if recognized_text:
-            update.message.reply_text(f"Распознанный текст: {recognized_text}")
-        else:
-            update.message.reply_text("Не удалось распознать голосовое сообщение.")
+        # Голосовое сообщение обрабатываем через функцию из command_parser
+        handle_voice_command(update, context)
     else:
-        update.message.reply_text(
-            "Функционал пока не реализован для произвольных сообщений. "
-            "Используйте команды /start, /help, /sendmail или /inbox."
-        )
+        handle_text_message(update, context)
