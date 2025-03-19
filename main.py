@@ -15,7 +15,11 @@ from handlers.telegram_handler import (
     cancelevent_command,
     schedule_command,
     setreminder_command,
-    handle_message
+    handle_message,
+    delete_spam_command,
+    delete_trash_command,
+    delete_promo_command,
+    getstarred_command
 )
 
 logging.basicConfig(
@@ -42,6 +46,10 @@ def main():
     dispatcher.add_handler(CommandHandler("cancelevent", cancelevent_command))
     dispatcher.add_handler(CommandHandler("schedule", schedule_command))
     dispatcher.add_handler(CommandHandler("setreminder", setreminder_command))
+    dispatcher.add_handler(CommandHandler("deletespam", delete_spam_command))
+    dispatcher.add_handler(CommandHandler("deletetrash", delete_trash_command))
+    dispatcher.add_handler(CommandHandler("deletepromo", delete_promo_command))
+    dispatcher.add_handler(CommandHandler("getstarred", getstarred_command))
 
     # Обработка любых нераспознанных сообщений (текст и голос)
     dispatcher.add_handler(MessageHandler(Filters.text | Filters.voice, handle_message))

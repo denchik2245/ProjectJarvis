@@ -7,7 +7,10 @@ from datetime import datetime
 from email.mime.text import MIMEText
 from googleapiclient.discovery import build
 from google.oauth2.credentials import Credentials
+from telegram import Update
+from telegram.ext import CallbackContext
 
+# Получить доступ к Gmail
 def get_gmail_service():
     credentials_file = os.getenv('GOOGLE_API_CREDENTIALS')
     if not credentials_file:
@@ -16,7 +19,7 @@ def get_gmail_service():
     service = build('gmail', 'v1', credentials=creds)
     return service
 
-# Создать сообщение
+# Создать письмо
 def create_message(sender: str, to: str, subject: str, message_text: str) -> dict:
     message = MIMEText(message_text)
     message['to'] = to
@@ -25,7 +28,7 @@ def create_message(sender: str, to: str, subject: str, message_text: str) -> dic
     raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
     return {'raw': raw_message}
 
-# Отправить сообщение
+# Отправить письмо
 def send_email(recipient: str, subject: str, message_text: str) -> dict:
     service = get_gmail_service()
     sender = os.getenv('GMAIL_SENDER')
@@ -35,7 +38,43 @@ def send_email(recipient: str, subject: str, message_text: str) -> dict:
     sent_message = service.users().messages().send(userId="me", body=message).execute()
     return sent_message
 
-# Получить базовую информацию о последних сообщениях из входящих
+# Отправить письмо в заданное время
+def send_email_at_time(recipient: str, subject: str, message_text: str, send_time_str: str):
+    parsed_time = dateparser.parse(send_time_str, languages=['ru'])
+    if parsed_time is None:
+        raise Exception(f"Не удалось распознать время: {send_time_str}")
+    delay = (parsed_time - datetime.now()).total_seconds()
+    if delay < 0:
+        raise Exception("Указанное время уже прошло.")
+    timer = threading.Timer(delay, lambda: send_email(recipient, subject, message_text))
+    timer.start()
+    return timer
+
+# Получить черновики
+def get_drafts() -> list:
+    service = get_gmail_service()
+    drafts_result = service.users().drafts().list(userId="me").execute()
+    drafts = drafts_result.get('drafts', [])
+    return drafts
+
+# Отправить черновик по заголовку
+def send_draft_by_subject(draft_subject: str) -> dict:
+    service = get_gmail_service()
+    drafts = get_drafts()
+    for draft in drafts:
+        draft_id = draft.get('id')
+        full_draft = service.users().drafts().get(userId="me", id=draft_id, format="full").execute()
+        headers = full_draft.get("message", {}).get("payload", {}).get("headers", [])
+        for header in headers:
+            if header.get("name", "").lower() == "subject" and header.get("value", "").lower() == draft_subject.lower():
+                sent = service.users().drafts().send(
+                    userId="me",
+                    body={"id": draft_id, "message": full_draft.get("message")}
+                ).execute()
+                return sent
+    raise Exception("Черновик с указанным заголовком не найден.")
+
+# Получить базовую информацию о последних письмах из входящих
 def get_inbox_messages(max_results: int = 10) -> list:
     service = get_gmail_service()
     result = service.users().messages().list(
@@ -54,7 +93,7 @@ def get_inbox_messages(max_results: int = 10) -> list:
 
     return messages_info
 
-# Функция для получения детальной информации о сообщении по его ID
+# Функция для получения детальной информации о письме по его ID
 def get_message_details(msg_id: str) -> dict:
     service = get_gmail_service()
     full_msg = service.users().messages().get(userId='me', id=msg_id, format='full').execute()
@@ -63,7 +102,6 @@ def get_message_details(msg_id: str) -> dict:
     subject = next((h["value"] for h in headers if h["name"].lower() == "subject"), "No Subject")
     from_header = next((h["value"] for h in headers if h["name"].lower() == "from"), "Unknown Sender")
 
-    # Парсинг отправителя: имя и email (если формат "Имя <email>")
     match = re.search(r'<(.+?)>', from_header)
     if match:
         from_email = match.group(1)
@@ -72,9 +110,7 @@ def get_message_details(msg_id: str) -> dict:
         from_email = from_header
         from_name = from_header
 
-    # Извлекаем snippet, если он есть
     snippet = full_msg.get("snippet", "")
-
     payload = full_msg.get("payload", {})
     content = ""
     attachments = []
@@ -83,7 +119,7 @@ def get_message_details(msg_id: str) -> dict:
         for part in payload["parts"]:
             mime_type = part.get("mimeType")
             filename = part.get("filename", "")
-            if filename:  # Это вложение
+            if filename:
                 attachments.append(filename)
             else:
                 if mime_type == "text/plain":
@@ -112,16 +148,16 @@ def get_message_details(msg_id: str) -> dict:
 
     return {
         "id": msg_id,
-        "from": from_header,      # оригинальное значение "from"
+        "from": from_header,
         "from_name": from_name,
         "from_email": from_email,
         "subject": subject,
-        "snippet": snippet,       # добавляем snippet
+        "snippet": snippet,
         "content": content,
         "attachments": attachments
     }
 
-# Выводит на экран информацию о сообщениях в удобном формате
+# Выводит на экран информацию о письмах в удобном формате
 def print_messages(messages: list):
     for i, msg in enumerate(messages, start=1):
         print(f"{i}. От: {msg['from_name']}")
@@ -130,65 +166,8 @@ def print_messages(messages: list):
         print(f"Содержание: {msg['snippet']}")
         print()
 
-#Отправляет письмо в заданное время
-def send_email_at_time(recipient: str, subject: str, message_text: str, send_time_str: str):
-    """
-    Отправляет письмо в заданное время.
-    Время можно задавать в естественном формате, например:
-    "Завтра утром", "В понедельник вечером" или "20 марта 2025 год, в 14:30".
-
-    Функция парсит время с помощью dateparser, вычисляет задержку и планирует отправку письма с использованием threading.Timer.
-    Возвращает объект Timer.
-    """
-    parsed_time = dateparser.parse(send_time_str, languages=['ru'])
-    if parsed_time is None:
-        raise Exception(f"Не удалось распознать время: {send_time_str}")
-    delay = (parsed_time - datetime.now()).total_seconds()
-    if delay < 0:
-        raise Exception("Указанное время уже прошло.")
-    timer = threading.Timer(delay, lambda: send_email(recipient, subject, message_text))
-    timer.start()
-    return timer
-
-def get_drafts() -> list:
-    """
-    Возвращает список черновиков из Gmail.
-    """
-    service = get_gmail_service()
-    drafts_result = service.users().drafts().list(userId="me").execute()
-    drafts = drafts_result.get('drafts', [])
-    return drafts
-
-def send_draft_by_subject(draft_subject: str) -> dict:
-    """
-    Ищет черновик по заголовку (Subject) и отправляет его.
-    Если найден черновик, используется метод drafts.send.
-    Если черновик не найден, генерируется исключение.
-    """
-    service = get_gmail_service()
-    drafts = get_drafts()
-    for draft in drafts:
-        draft_id = draft.get('id')
-        full_draft = service.users().drafts().get(userId="me", id=draft_id, format="full").execute()
-        headers = full_draft.get("message", {}).get("payload", {}).get("headers", [])
-        for header in headers:
-            if header.get("name", "").lower() == "subject" and header.get("value", "").lower() == draft_subject.lower():
-                sent = service.users().drafts().send(
-                    userId="me",
-                    body={"id": draft_id, "message": full_draft.get("message")}
-                ).execute()
-                return sent
-    raise Exception("Черновик с указанным заголовком не найден.")
-
+# Получить непрочитанные письма
 def get_unread_messages(max_results: int = 10) -> list:
-    """
-    Возвращает список до max_results последних непрочитанных сообщений.
-    Каждое сообщение теперь содержит:
-    - от кого (имя и email)
-    - тему
-    - полное содержание
-    - список вложений (если имеются)
-    """
     service = get_gmail_service()
     result = service.users().messages().list(
         userId='me',
@@ -204,16 +183,24 @@ def get_unread_messages(max_results: int = 10) -> list:
         unread_messages.append(msg_details)
     return unread_messages
 
+# Получить помеченные сообщения
+def get_starred_messages(max_results: int = 10) -> list:
+    service = get_gmail_service()
+    result = service.users().messages().list(
+        userId='me',
+        labelIds=['STARRED'],
+        maxResults=max_results
+    ).execute()
+    messages = result.get("messages", [])
+    starred_messages = []
+    for msg in messages:
+        msg_id = msg.get("id")
+        msg_details = get_message_details(msg_id)
+        starred_messages.append(msg_details)
+    return starred_messages
+
+# Получить письмо по заголовку
 def find_email_by_subject(subject_search: str) -> list:
-    """
-    Ищет письма по заголовку (Subject) и возвращает список сообщений,
-    в заголовке которых содержится заданная подстрока (без учета регистра).
-    Для каждого сообщения возвращается:
-    - от кого (имя и email)
-    - тема
-    - полное содержание
-    - список вложений (если имеются)
-    """
     service = get_gmail_service()
     query = f"subject:{subject_search}"
     result = service.users().messages().list(userId="me", q=query, maxResults=10).execute()
@@ -225,3 +212,52 @@ def find_email_by_subject(subject_search: str) -> list:
         if subject_search.lower() in msg_details.get("subject", "").lower():
             found_emails.append(msg_details)
     return found_emails
+
+# Удаления сообщений из папки "Спам"
+def delete_spam_command(update: Update, context: CallbackContext) -> None:
+    from Services.Google_Gmail import get_gmail_service
+    try:
+        service = get_gmail_service()
+        result = service.users().messages().list(userId="me", labelIds=["SPAM"]).execute()
+        messages = result.get("messages", [])
+        if not messages:
+            update.message.reply_text("Нет сообщений в спаме.")
+            return
+        for msg in messages:
+            service.users().messages().delete(userId="me", id=msg["id"]).execute()
+        update.message.reply_text(f"Удалено {len(messages)} сообщений из спама.")
+    except Exception as e:
+        update.message.reply_text(f"Ошибка при удалении спама: {e}")
+
+# Удаления сообщений из папки "Корзина"
+def delete_trash_command(update: Update, context: CallbackContext) -> None:
+    from Services.Google_Gmail import get_gmail_service
+    try:
+        service = get_gmail_service()
+        result = service.users().messages().list(userId="me", labelIds=["TRASH"]).execute()
+        messages = result.get("messages", [])
+        if not messages:
+            update.message.reply_text("Нет сообщений в корзине.")
+            return
+        for msg in messages:
+            service.users().messages().delete(userId="me", id=msg["id"]).execute()
+        update.message.reply_text(f"Удалено {len(messages)} сообщений из корзины.")
+    except Exception as e:
+        update.message.reply_text(f"Ошибка при удалении корзины: {e}")
+
+# Удаления сообщений из папки "Промоакция"
+def delete_promo_command(update: Update, context: CallbackContext) -> None:
+    from Services.Google_Gmail import get_gmail_service
+    try:
+        service = get_gmail_service()
+        # Gmail использует метку CATEGORY_PROMOTIONS для промоакций
+        result = service.users().messages().list(userId="me", labelIds=["CATEGORY_PROMOTIONS"]).execute()
+        messages = result.get("messages", [])
+        if not messages:
+            update.message.reply_text("Нет сообщений в промоакциях.")
+            return
+        for msg in messages:
+            service.users().messages().delete(userId="me", id=msg["id"]).execute()
+        update.message.reply_text(f"Удалено {len(messages)} сообщений из промоакций.")
+    except Exception as e:
+        update.message.reply_text(f"Ошибка при удалении промоакций: {e}")

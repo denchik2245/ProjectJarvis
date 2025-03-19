@@ -7,6 +7,8 @@ from google.oauth2.credentials import Credentials
 SCOPES = [
     'https://www.googleapis.com/auth/gmail.send',
     'https://www.googleapis.com/auth/gmail.readonly',
+    'https://www.googleapis.com/auth/gmail.modify',
+    'https://mail.google.com/',
     'https://www.googleapis.com/auth/calendar',
 ]
 

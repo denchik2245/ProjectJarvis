@@ -17,32 +17,40 @@ def help_command(update: Update, context: CallbackContext) -> None:
     help_message = (
         "✉️ *Команды для Почты:*\n\n"
         "Отправить письмо\n"
-        "`/sendmail email@example.com Тема письма`\n"
+        "`/sendmail email@example.com Тема письма`\n\n"
         "Отправить письмо по расписанию\n"
-        "`/sendmailat email@example.com Тема письма | Текст письма | [Время, например, 'Завтра утром' или '20 марта 2025 год, в 14:30']`\n"
+        "`/sendmailat email@example.com Тема письма | Текст письма | [Время, например, 'Завтра утром' или '20 марта 2025 год, в 14:30']`\n\n"
         "Отправить черновик по заголовку\n"
-        "`/senddraft Заголовок черновика`\n"
+        "`/senddraft Заголовок черновика`\n\n"
         "Получить 10 последних непрочитанных сообщений\n"
-        "`/getunread`\n"
+        "`/getunread`\n\n"
         "Найти письмо по заголовку\n"
-        "`/findemail Тема письма`\n"
+        "`/findemail Тема письма`\n\n"
         "Получить последние письма из входящих\n"
         "`/inbox`\n\n"
+        "Получить 10 последних помеченных сообщений\n"
+        "`/getstarred`\n\n"
+        "Удалить спам\n"
+        "`/deletespam`\n\n"
+        "Удалить корзину\n"
+        "`/deletetrash`\n\n"
+        "Удалить промоакции\n"
+        "`/deletepromo`\n\n"
         "📝 *Команды для Заметок (Google Keep):*\n\n"
         "Добавить заметку\n"
         "`/addnote Заголовок заметки | Текст заметки`\n\n"
         "🔔 *Команды для Календаря:*\n\n"
         "Добавить событие\n"
-        "`/addevent Название, описание, начало (например 17:00), конец (например 19:00), 5 минут`\n"
+        "`/addevent Название, описание, начало (например 17:00), конец (например 19:00), 5 минут`\n\n"
         "Отменить событие по названию\n"
-        "`/cancelevent Название события`\n"
+        "`/cancelevent Название события`\n\n"
         "Получить повестку дня\n"
-        "`/schedule [Сегодня или дата, например, '20 марта 2050 год']`\n"
+        "`/schedule [Сегодня или дата, например, '20 марта 2050 год']`\n\n"
         "Установить напоминание для события\n"
         "`/setreminder Название события, 5 минут`\n\n"
         "ℹ️ *Общие команды:*\n\n"
         "Начало работы с ботом\n"
-        "`/start`\n"
+        "`/start`\n\n"
         "Справка\n"
         "`/help`"
     )
@@ -181,6 +189,75 @@ def findemail_command(update: Update, context: CallbackContext) -> None:
         update.message.reply_text(response_text)
     except Exception as e:
         update.message.reply_text(f"Ошибка при поиске письма: {e}")
+
+# Команда для удаления сообщений из папки "Спам"
+def delete_spam_command(update: Update, context: CallbackContext) -> None:
+    from Services.Google_Gmail import get_gmail_service
+    try:
+        service = get_gmail_service()
+        result = service.users().messages().list(userId="me", labelIds=["SPAM"]).execute()
+        messages = result.get("messages", [])
+        if not messages:
+            update.message.reply_text("Нет сообщений в спаме.")
+            return
+        for msg in messages:
+            service.users().messages().delete(userId="me", id=msg["id"]).execute()
+        update.message.reply_text(f"Удалено {len(messages)} сообщений из спама.")
+    except Exception as e:
+        update.message.reply_text(f"Ошибка при удалении спама: {e}")
+
+# Команда для удаления сообщений из папки "Корзина"
+def delete_trash_command(update: Update, context: CallbackContext) -> None:
+    from Services.Google_Gmail import get_gmail_service
+    try:
+        service = get_gmail_service()
+        result = service.users().messages().list(userId="me", labelIds=["TRASH"]).execute()
+        messages = result.get("messages", [])
+        if not messages:
+            update.message.reply_text("Нет сообщений в корзине.")
+            return
+        for msg in messages:
+            service.users().messages().delete(userId="me", id=msg["id"]).execute()
+        update.message.reply_text(f"Удалено {len(messages)} сообщений из корзины.")
+    except Exception as e:
+        update.message.reply_text(f"Ошибка при удалении корзины: {e}")
+
+# Команда для удаления сообщений из папки "Промоакция"
+def delete_promo_command(update: Update, context: CallbackContext) -> None:
+    from Services.Google_Gmail import get_gmail_service
+    try:
+        service = get_gmail_service()
+        result = service.users().messages().list(userId="me", labelIds=["CATEGORY_PROMOTIONS"]).execute()
+        messages = result.get("messages", [])
+        if not messages:
+            update.message.reply_text("Нет сообщений в промоакциях.")
+            return
+        for msg in messages:
+            service.users().messages().delete(userId="me", id=msg["id"]).execute()
+        update.message.reply_text(f"Удалено {len(messages)} сообщений из промоакций.")
+    except Exception as e:
+        update.message.reply_text(f"Ошибка при удалении промоакций: {e}")
+
+# Вывод помеченных сообщений
+def getstarred_command(update: Update, context: CallbackContext) -> None:
+    from Services.Google_Gmail import get_starred_messages
+    try:
+        messages = get_starred_messages(max_results=10)
+        if not messages:
+            update.message.reply_text("Нет помеченных сообщений.")
+            return
+        response_lines = []
+        for i, msg in enumerate(messages, start=1):
+            response_lines.append(
+                f"{i}. От: {msg['from_name']}\n"
+                f"   Почта: {msg['from_email']}\n"
+                f"   Тема: {msg['subject']}\n"
+                f"   Содержание: {msg['snippet']}"
+            )
+        response_text = "\n\n".join(response_lines)
+        update.message.reply_text(response_text)
+    except Exception as e:
+        update.message.reply_text(f"Ошибка при получении помеченных сообщений: {e}")
 
 #Команда /addnote
 def addnote_command(update: Update, context: CallbackContext) -> None:
