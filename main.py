@@ -5,7 +5,11 @@ from handlers.telegram_handler import (
     start,
     help_command,
     sendmail_command,
+    sendmailat_command,
+    senddraft_command,
     inbox_command,
+    getunread_command,
+    findemail_command,
     addnote_command,
     addevent_command,
     cancelevent_command,
@@ -28,7 +32,11 @@ def main():
     dispatcher.add_handler(CommandHandler("start", start))
     dispatcher.add_handler(CommandHandler("help", help_command))
     dispatcher.add_handler(CommandHandler("sendmail", sendmail_command))
+    dispatcher.add_handler(CommandHandler("sendmailat", sendmailat_command))
+    dispatcher.add_handler(CommandHandler("senddraft", senddraft_command))
     dispatcher.add_handler(CommandHandler("inbox", inbox_command))
+    dispatcher.add_handler(CommandHandler("getunread", getunread_command))
+    dispatcher.add_handler(CommandHandler("findemail", findemail_command))
     dispatcher.add_handler(CommandHandler("addnote", addnote_command))
     dispatcher.add_handler(CommandHandler("addevent", addevent_command))
     dispatcher.add_handler(CommandHandler("cancelevent", cancelevent_command))
