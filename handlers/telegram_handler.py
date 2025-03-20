@@ -427,6 +427,53 @@ def cancelevent_command(update: Update, context: CallbackContext) -> None:
         update.message.reply_text(f"Событие '{event_name}' успешно отменено.")
     except Exception as e:
         update.message.reply_text(f"Ошибка при отмене события: {e}")
+        
+#Команда /getcurrentweather
+def getcurrentweather_command(update: Update, context: CallbackContext) -> None:
+    from Services.Weather import get_current_weather, get_city
+    try:
+        json = get_current_weather()
+        update.message.reply_text(f"Сейчас в городе { get_city() } { json['condition']}. Температура { json['temperature']}, ощущается как  { json['feels_like']}. Cкорость ветра { json['wind_speed']}, а влажность  { json['humidity']}")
+    except Exception as e:
+        update.message.reply_text(f"Ошибка при получении данных от Яндекс Погоды: {e}")
+        
+#Команда /getweather
+def getweather_command(update: Update, context: CallbackContext) -> None:
+    from Services.Weather import get_weather_forecast, get_city
+    
+    text = update.message.text
+    days = text[len('/getweather'):].strip()
+    if days >= 1 and days <=7: 
+        try:
+            json = get_weather_forecast(days)
+            for forcast in json: 
+                update.message.reply_text(f" {forcast['date']} в городе { get_city() } будет { forcast['condition']}. Температура { forcast['temperature']}, ощущается как  { forcast['feels_like']}. Cкорость ветра { forcast['wind_speed']}, а влажность  { forcast['humidity']}")
+        except Exception as e:
+            update.message.reply_text(f"Ошибка при получении данных от Яндекс Погоды: {e}")
+    else:
+        update.message.reply_text(f'Прогноз доступен на промежуток от 1 до 7 дней. Введено: {days}')    
+        
+#Команда /changecity
+def changecity_command(update: Update, context: CallbackContext) -> None:
+    from Services.Weather import set_city
+    
+    text = update.message.text
+    city = text[len('/changecity'):].strip()
+    try:
+        newcity = set_city(city)
+        update.message.reply_text(f"Новый город: {newcity}")
+    except Exception as e:
+        update.message.reply_text(f"Не удалось изменить город: {e}")
+        
+#Команда /getcity
+def getcity_command(update: Update, context: CallbackContext) -> None:
+    from Services.Weather import get_city
+    try:
+        city = get_city()
+        update.message.reply_text(f"Город {city['city']}, широта {city['lat']}, долгота {city['lon']}.")
+    except Exception as e:
+        update.message.reply_text(f"Не удалось узнать город: {e}")
+    
 
 # Обработка обычных текстовых сообщений
 def handle_text_message(update: Update, context: CallbackContext) -> None:
