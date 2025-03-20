@@ -7,7 +7,7 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 from handlers.telegram_handler import start, help_command, sendmail_command, sendmailat_command, \
     senddraft_command, inbox_command, getunread_command, findemail_command, addnote_command, \
     addevent_command, cancelevent_command, schedule_command, setreminder_command, delete_spam_command, \
-    delete_trash_command, delete_promo_command, getstarred_command, handle_text_message  # handle_text_message для текстовых сообщений
+    delete_trash_command, delete_promo_command, getstarred_command, handle_text_message, weather_command, forecast_command  # handle_text_message для текстовых сообщений
 
 # Импортируем голосовой обработчик из nlp/command_parser
 from nlp.command_parser import handle_voice_command
@@ -46,6 +46,8 @@ def main():
     dispatcher.add_handler(CommandHandler("deletetrash", delete_trash_command))
     dispatcher.add_handler(CommandHandler("deletepromo", delete_promo_command))
     dispatcher.add_handler(CommandHandler("getstarred", getstarred_command))
+    dispatcher.add_handler(CommandHandler("weather", weather_command))
+    dispatcher.add_handler(CommandHandler("forecast", forecast_command))
 
     # Обработка всех сообщений (текст и голос)
     dispatcher.add_handler(MessageHandler(Filters.text | Filters.voice, handle_message))

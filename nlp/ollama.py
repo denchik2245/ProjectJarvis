@@ -1,14 +1,9 @@
-# nlp/ollama.py
-
 import requests
 import json
 import re
 from nlp.prompts import COMMAND_PROMPTS
 
 def ask_ollama(prompt: str) -> str:
-    """
-    Отправляет запрос к серверу Ollama (эндпоинт /v1/completions) и возвращает текст ответа.
-    """
     url = "http://127.0.0.1:11434/v1/completions"
     payload = {
         "model": "deepseek-r1:14b",
@@ -56,30 +51,36 @@ def build_system_prompt(user_text: str) -> str:
     )
     return prompt
 
+
 def parse_command_from_text(user_text: str) -> dict:
-    """
-    Передаёт распознанный текст в Ollama для анализа и возвращает JSON вида:
-      {"command": "clear_mailbox_trash", "arguments": {}}
-    Если не удалось распознать, возвращает {"command": "unknown", "arguments": {}}.
-    """
     system_prompt = build_system_prompt(user_text)
     response = ask_ollama(system_prompt)
     print("Ответ от Ollama:", response)  # для отладки
 
-    try:
-        data = json.loads(response)
-    except json.JSONDecodeError:
-        m = re.search(r'(\{.*\})', response, re.DOTALL)
-        if m:
-            try:
-                data = json.loads(m.group(1))
-            except json.JSONDecodeError:
-                data = {"command": "unknown", "arguments": {}}
-        else:
-            data = {"command": "unknown", "arguments": {}}
+    json_candidates = []
+    matches = re.findall(r'(\{.*?\})', response, re.DOTALL)
+    for candidate in matches:
+        try:
+            data = json.loads(candidate)
+            if "command" in data:
+                json_candidates.append(data)
+        except json.JSONDecodeError:
+            continue
 
-    if "command" not in data:
-        data["command"] = "unknown"
-    if "arguments" not in data:
-        data["arguments"] = {}
-    return data
+    # Если есть кандидаты, сначала ищем тот, у которого command != "unknown"
+    selected = None
+    for cand in json_candidates:
+        if cand.get("command", "unknown") != "unknown":
+            selected = cand
+            break
+    if not selected and json_candidates:
+        selected = json_candidates[-1]
+    if not selected:
+        selected = {"command": "unknown", "arguments": {}}
+
+    # Гарантируем наличие ключей
+    if "command" not in selected:
+        selected["command"] = "unknown"
+    if "arguments" not in selected:
+        selected["arguments"] = {}
+    return selected
