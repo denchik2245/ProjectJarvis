@@ -1,3 +1,5 @@
+# В файле ollama.py
+
 import requests
 import json
 import re
@@ -14,23 +16,20 @@ def ask_ollama(prompt: str) -> str:
         response = requests.post(url, json=payload)
         response.raise_for_status()
         data = response.json()
-        # Если сервер возвращает формат с ключом "choices"
+
         if isinstance(data, dict) and "choices" in data:
             text_response = "".join(choice.get("text", "") for choice in data["choices"])
-        # Если возвращается список чанков
         elif isinstance(data, list):
             text_response = "".join(chunk.get("content", "") for chunk in data)
         else:
             text_response = data.get("completion", "")
+
         return text_response.strip()
     except requests.exceptions.RequestException as e:
         print("Ошибка при запросе к Ollama:", e)
         return ""
 
 def build_system_prompt(user_text: str) -> str:
-    """
-    Формирует системный промт, включая подробные примеры для всех команд.
-    """
     examples = []
     for command, data in COMMAND_PROMPTS.items():
         for phrase in data["examples"]:
@@ -51,50 +50,58 @@ def build_system_prompt(user_text: str) -> str:
     )
     return prompt
 
-
-def parse_command_from_text(user_text: str) -> dict:
+def parse_command_from_text(user_text: str) -> list:
     system_prompt = build_system_prompt(user_text)
     response = ask_ollama(system_prompt)
     print("Ответ от Ollama:", response)  # для отладки
 
     json_candidates = []
-    # Мы ищем один или несколько объектов JSON в ответе
-    matches = re.findall(r'(\{.*?\})', response, re.DOTALL)
-    for candidate in matches:
+
+    # Сначала пытаемся извлечь JSON из блока, обрамленного ```json ... ```
+    if "```json" in response:
         try:
-            data = json.loads(candidate)
-            # Если в кандидате есть либо "command", либо "action"
-            if "command" in data or "action" in data:
+            json_block = re.search(r"```json(.*?)```", response, re.DOTALL)
+            if json_block:
+                json_text = json_block.group(1).strip()
+                data = json.loads(json_text)
                 json_candidates.append(data)
-        except json.JSONDecodeError:
-            continue
+        except Exception as e:
+            print("Ошибка при разборе JSON из блока:", e)
 
-    selected_commands = []
+    # Если не нашли через блок, пробуем искать все объекты JSON в ответе
+    if not json_candidates:
+        matches = re.findall(r'(\{.*?\})', response, re.DOTALL)
+        for candidate in matches:
+            try:
+                data = json.loads(candidate)
+                if "command" in data:
+                    json_candidates.append(data)
+            except json.JSONDecodeError:
+                continue
 
-    # Обрабатываем все найденные команды
+    # Выбираем первый кандидат, у которого команда не "unknown"
+    selected_command = None
     for cand in json_candidates:
-        if "command" in cand:
-            # Преобразуем "action" в "command", если нужно
-            action_to_command = {
-                "delete_bin": "clear_mailbox_trash",
-                "delete_trash": "clear_mailbox_trash",
-                "delete_spam": "delete_spam",
-                "delete_promo": "delete_promo",
-            }
-            command = action_to_command.get(cand.get("command", ""), "unknown")
-            selected_commands.append({"command": command, "arguments": {}})
-        elif "action" in cand:
-            # Преобразуем "action" в "command"
-            action_to_command = {
-                "delete_bin": "clear_mailbox_trash",
-                "delete_trash": "clear_mailbox_trash",
-                "delete_spam": "delete_spam",
-                "delete_promo": "delete_promo",
-            }
-            command = action_to_command.get(cand.get("action", ""), "unknown")
-            selected_commands.append({"command": command, "arguments": {}})
+        if cand.get("command") != "unknown":
+            selected_command = cand
+            break
 
-    if not selected_commands:
-        selected_commands.append({"command": "unknown", "arguments": {}})
+    if not selected_command:
+        selected_command = {"command": "unknown", "arguments": {}}
+    else:
+        # Если команда create_event — заполняем недостающие поля
+        if selected_command.get("command") == "create_event":
+            arguments = selected_command.get("arguments", {})
+            if "title" not in arguments:
+                arguments["title"] = "Без названия"
+            if "start_time" not in arguments:
+                arguments["start_time"] = "00:00"
+            if "end_time" not in arguments:
+                arguments["end_time"] = arguments.get("start_time", "00:00")
+            if "description" not in arguments:
+                arguments["description"] = ""
+            if "reminder" not in arguments:
+                arguments["reminder"] = False
+            selected_command["arguments"] = arguments
 
-    return selected_commands
+    return [selected_command]
