@@ -1,13 +1,40 @@
-# main.py
-
 import logging
 import config
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 
-from handlers.telegram_handler import start, help_command, sendmail_command, sendmailat_command, \
-    senddraft_command, inbox_command, getunread_command, findemail_command, addnote_command, \
-    addevent_command, cancelevent_command, schedule_command, setreminder_command, delete_spam_command, \
-    delete_trash_command, delete_promo_command, getstarred_command, handle_text_message, weather_command, forecast_command  # handle_text_message для текстовых сообщений
+# Импортируем общие команды (start, help, обработчик текстовых сообщений)
+from handlers.telegram_handler import start, help_command, handle_text_message
+
+# Импортируем команды Gmail
+from handlers.Gmail_handler import (
+    sendmail_command,
+    sendmailat_command,
+    senddraft_command,
+    inbox_command,
+    getunread_command,
+    findemail_command,
+    delete_spam_command,
+    delete_trash_command,
+    delete_promo_command,
+    getstarred_command
+)
+
+# Импортируем команды Google Calendar
+from handlers.Calendar_handler import (
+    addevent_command,
+    cancelevent_command,
+    schedule_command,
+    setreminder_command
+)
+
+# Импортируем команды погоды
+from handlers.Weather_handler import (
+    weather_command,
+    forecast_command
+)
+
+# Импортируем команды заметок
+from handlers.Notes_handler import addnote_command
 
 # Импортируем голосовой обработчик из nlp/command_parser
 from nlp.command_parser import handle_voice_command
