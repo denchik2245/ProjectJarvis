@@ -10,6 +10,8 @@ SCOPES = [
     'https://www.googleapis.com/auth/gmail.modify',
     'https://mail.google.com/',
     'https://www.googleapis.com/auth/calendar',
+    'https://www.googleapis.com/auth/drive.file',
+    'https://www.googleapis.com/auth/drive',
 ]
 
 def main():
