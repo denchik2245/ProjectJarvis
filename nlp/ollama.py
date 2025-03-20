@@ -29,15 +29,15 @@ def ask_ollama(prompt: str) -> str:
 
 def build_system_prompt(user_text: str) -> str:
     """
-    Формирует системный промт, включающий подробные примеры для всех команд.
+    Формирует системный промт, включая подробные примеры для всех команд.
     """
     examples = []
-    for command, phrases in COMMAND_PROMPTS.items():
-        for phrase in phrases:
+    for command, data in COMMAND_PROMPTS.items():
+        for phrase in data["examples"]:
             examples.append(f"Пользователь: \"{phrase}\"\nОтвет: {{\"command\": \"{command}\", \"arguments\": {{}}}}")
     examples_text = "\n\n".join(examples)
     prompt = (
-        "Ты являешься высококвалифицированным голосовым ассистентом, специализирующимся на понимании и анализе запросов на русском языке. "
+        "Ты являешься высококвалифицированным голосовым ассистентом, специализирующимся на понимании запросов на русском языке. "
         "Твоя задача — определить, какую команду хочет выполнить пользователь, и вернуть ответ строго в формате JSON, содержащем два ключа: \"command\" и \"arguments\".\n\n"
         "Важно:\n"
         "1. Ответ должен быть исключительно JSON, без каких-либо пояснений или комментариев.\n"
@@ -58,29 +58,43 @@ def parse_command_from_text(user_text: str) -> dict:
     print("Ответ от Ollama:", response)  # для отладки
 
     json_candidates = []
+    # Мы ищем один или несколько объектов JSON в ответе
     matches = re.findall(r'(\{.*?\})', response, re.DOTALL)
     for candidate in matches:
         try:
             data = json.loads(candidate)
-            if "command" in data:
+            # Если в кандидате есть либо "command", либо "action"
+            if "command" in data or "action" in data:
                 json_candidates.append(data)
         except json.JSONDecodeError:
             continue
 
-    # Если есть кандидаты, сначала ищем тот, у которого command != "unknown"
-    selected = None
-    for cand in json_candidates:
-        if cand.get("command", "unknown") != "unknown":
-            selected = cand
-            break
-    if not selected and json_candidates:
-        selected = json_candidates[-1]
-    if not selected:
-        selected = {"command": "unknown", "arguments": {}}
+    selected_commands = []
 
-    # Гарантируем наличие ключей
-    if "command" not in selected:
-        selected["command"] = "unknown"
-    if "arguments" not in selected:
-        selected["arguments"] = {}
-    return selected
+    # Обрабатываем все найденные команды
+    for cand in json_candidates:
+        if "command" in cand:
+            # Преобразуем "action" в "command", если нужно
+            action_to_command = {
+                "delete_bin": "clear_mailbox_trash",
+                "delete_trash": "clear_mailbox_trash",
+                "delete_spam": "delete_spam",
+                "delete_promo": "delete_promo",
+            }
+            command = action_to_command.get(cand.get("command", ""), "unknown")
+            selected_commands.append({"command": command, "arguments": {}})
+        elif "action" in cand:
+            # Преобразуем "action" в "command"
+            action_to_command = {
+                "delete_bin": "clear_mailbox_trash",
+                "delete_trash": "clear_mailbox_trash",
+                "delete_spam": "delete_spam",
+                "delete_promo": "delete_promo",
+            }
+            command = action_to_command.get(cand.get("action", ""), "unknown")
+            selected_commands.append({"command": command, "arguments": {}})
+
+    if not selected_commands:
+        selected_commands.append({"command": "unknown", "arguments": {}})
+
+    return selected_commands

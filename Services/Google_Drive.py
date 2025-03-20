@@ -21,7 +21,7 @@ def get_drive_service():
 
 def upload_file_to_drive(file_path: str, file_name: str, folder_id: str = None) -> str:
     """
-    Загружает файл на Google Drive.
+    Загружает файл на Google Drive с использованием механизма resumable upload.
     :param file_path: Путь к локальному файлу на диске.
     :param file_name: Имя, под которым файл будет сохранён в Google Drive.
     :param folder_id: (опционально) ID папки, в которую загрузить.
@@ -37,10 +37,19 @@ def upload_file_to_drive(file_path: str, file_name: str, folder_id: str = None) 
         file_metadata['parents'] = [folder_id]
 
     media = MediaFileUpload(file_path, resumable=True)
-    uploaded_file = service.files().create(
+
+    # Начинаем загрузку файла с поддержкой возобновляемых попыток
+    request = service.files().create(
         body=file_metadata,
         media_body=media,
         fields='id'
-    ).execute()
+    )
 
-    return uploaded_file.get('id')
+    # Загрузка через поток (resumable)
+    response = None
+    while response is None:
+        status, response = request.next_chunk()
+        if status:
+            print(f"Загрузка {int(status.progress() * 100)}%.")
+
+    return response.get('id')

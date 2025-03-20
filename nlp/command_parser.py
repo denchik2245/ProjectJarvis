@@ -1,9 +1,6 @@
-# nlp/command_parser.py
-
 import logging
 from telegram import Update
 from telegram.ext import CallbackContext
-
 from .voice_recognition import process_voice_message
 from .ollama import parse_command_from_text
 
@@ -28,29 +25,45 @@ def handle_voice_command(update: Update, context: CallbackContext) -> None:
         update.message.reply_text("Не удалось распознать голосовое сообщение. Попробуйте ещё раз.")
         return
 
-    command_data = parse_command_from_text(recognized_text)
-    command = command_data.get("command", "unknown")
-    arguments = command_data.get("arguments", {})
+    # Разделяем сообщение по запятым (или другим символам) для обработки нескольких команд.
+    commands = parse_command_from_text(recognized_text)
 
-    logger.info(f"Распознана голосовая команда: {command}, аргументы: {arguments}")
+    # Используем множество для предотвращения дублирования команд
+    executed_commands = set()
 
-    if command == "clear_mailbox_trash":
-        delete_trash_command(update, context)
-    elif command == "delete_spam":
-        delete_spam_command(update, context)
-    elif command == "delete_promo":
-        delete_promo_command(update, context)
-    elif command == "send_message":
-        # Пример обработки другой команды (если необходимо)
-        to = arguments.get("to")
-        content = arguments.get("content")
-        if to and content:
-            from Services.Google_Contacts import send_message
-            send_message(to, content)
-            update.message.reply_text(f"Сообщение отправлено {to}: {content}")
+    for command_data in commands:
+        command = command_data.get("command", "unknown")
+        arguments = command_data.get("arguments", {})
+
+        logger.info(f"Распознана голосовая команда: {command}, аргументы: {arguments}")
+
+        # Если команда уже была выполнена, пропускаем её
+        if command in executed_commands:
+            continue
+
+        if command == "clear_mailbox_trash":
+            delete_trash_command(update, context)
+            executed_commands.add(command)
+        elif command == "delete_spam":
+            delete_spam_command(update, context)
+            executed_commands.add(command)
+        elif command == "delete_promo":
+            delete_promo_command(update, context)
+            executed_commands.add(command)
+        elif command == "send_message":
+            # Пример обработки другой команды (если необходимо)
+            to = arguments.get("to")
+            content = arguments.get("content")
+            if to and content:
+                from Services.Google_Contacts import send_message
+                send_message(to, content)
+                update.message.reply_text(f"Сообщение отправлено {to}: {content}")
+                executed_commands.add(command)
+            else:
+                update.message.reply_text("Не хватает аргументов для отправки сообщения.")
+                executed_commands.add(command)
         else:
-            update.message.reply_text("Не хватает аргументов для отправки сообщения.")
-    else:
-        update.message.reply_text(
-            f"Команда не распознана или не поддерживается. Распознанный текст: {recognized_text}"
-        )
+            update.message.reply_text(
+                f"Команда не распознана или не поддерживается. Распознанный текст: {recognized_text}"
+            )
+            executed_commands.add(command)
