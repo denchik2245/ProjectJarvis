@@ -13,11 +13,19 @@ from telegram.ext import (
 from handlers.telegram_handler import start, help_command, handle_text_message
 
 # Импортируем ConversationHandler-методы для загрузки в Google Drive
-from handlers.GoogleDrive_handler import (
+from handlers.Drive_handler import (
     upload_start,
     handle_file,
     done_uploading,
     WAITING_FOR_FILES
+)
+
+# Импортируем команды Google Contacts
+from handlers.Contacts_handler import (
+    getcontact_command,
+    getcontactsbycompany_command,
+    addcontact_command,
+    deletecontact_command
 )
 
 # Импортируем команды Gmail
@@ -34,6 +42,13 @@ from handlers.Gmail_handler import (
     getstarred_command
 )
 
+# Импортируем команды Google Docs
+from handlers.Docs_handler import (
+    adddoc_command,
+    deletedoc_command,
+    finddoc_command
+)
+
 # Импортируем команды Google Calendar
 from handlers.Calendar_handler import (
     addevent_command,
@@ -48,11 +63,8 @@ from handlers.Weather_handler import (
     forecast_command
 )
 
-# Импортируем команды заметок
-from handlers.Notes_handler import addnote_command
-
-# Импортируем голосовой обработчик из nlp/command_parser
-from nlp.command_parser import handle_voice_command
+# Импортируем голосовой обработчик из core/command_parser
+from handlers.command_handler import handle_voice_command
 
 
 logging.basicConfig(
@@ -103,7 +115,6 @@ def main():
     dispatcher.add_handler(CommandHandler("inbox", inbox_command))
     dispatcher.add_handler(CommandHandler("getunread", getunread_command))
     dispatcher.add_handler(CommandHandler("findemail", findemail_command))
-    dispatcher.add_handler(CommandHandler("addnote", addnote_command))
     dispatcher.add_handler(CommandHandler("addevent", addevent_command))
     dispatcher.add_handler(CommandHandler("cancelevent", cancelevent_command))
     dispatcher.add_handler(CommandHandler("schedule", schedule_command))
@@ -114,6 +125,13 @@ def main():
     dispatcher.add_handler(CommandHandler("getstarred", getstarred_command))
     dispatcher.add_handler(CommandHandler("weather", weather_command))
     dispatcher.add_handler(CommandHandler("forecast", forecast_command))
+    dispatcher.add_handler(CommandHandler("getcontact", getcontact_command))
+    dispatcher.add_handler(CommandHandler("getcontactsbycompany", getcontactsbycompany_command))
+    dispatcher.add_handler(CommandHandler("addcontact", addcontact_command))
+    dispatcher.add_handler(CommandHandler("deletecontact", deletecontact_command))
+    dispatcher.add_handler(CommandHandler("adddoc", adddoc_command))
+    dispatcher.add_handler(CommandHandler("deletedoc", deletedoc_command))
+    dispatcher.add_handler(CommandHandler("finddoc", finddoc_command))
 
     # Обработка всех прочих сообщений (текст и голос)
     dispatcher.add_handler(MessageHandler(Filters.text | Filters.voice, handle_message))

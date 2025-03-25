@@ -1,6 +1,6 @@
 from telegram import Update
 from telegram.ext import CallbackContext
-from nlp.command_parser import handle_voice_command
+from handlers.command_handler import handle_voice_command
 
 #Команда /start
 def start(update: Update, context: CallbackContext) -> None:
