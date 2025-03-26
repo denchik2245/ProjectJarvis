@@ -5,32 +5,14 @@ from Services import Google_Contacts
 logger = logging.getLogger(__name__)
 
 def partial_substring_ratio(a: str, b: str) -> float:
-    """
-    Возвращает частичное сходство (partial ratio) между строками a и b.
-    Значение от 0 до 1.
-    """
     return fuzz.partial_ratio(a.lower(), b.lower()) / 100.0
 
 def match_name(query: str, display_name: str) -> bool:
-    """
-    Сравнивает запрос и отображаемое имя.
-    Если запрос состоит из более чем одного слова, используем более высокий порог (0.85),
-    иначе порог 0.6.
-    """
     words = query.split()
     threshold = 0.85 if len(words) > 1 else 0.6
     return partial_substring_ratio(query, display_name) >= threshold
 
 def get_contact_info_command(update, command_arguments: dict, original_text: str):
-    """
-    Обрабатывает команду получения информации о контакте.
-
-    Ожидаемые аргументы:
-      - contact_name: имя для поиска (строка)
-      - field: поле, которое нужно вернуть (например, "phone" или "email")
-      - label: метка для фильтра (например, "рабочий", "Челгу" и т.п.)
-      - multiple: булевое значение, True если нужно вернуть все подходящие контакты
-    """
     prefix = f"Распознанный текст: {original_text}\n"
 
     contact_name = command_arguments.get("contact_name")

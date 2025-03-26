@@ -60,7 +60,7 @@ class DeepseekClient:
         logger.debug("Ответ от Deepseek: %s", response)
         json_candidates = []
 
-        # Попытка извлечь JSON из блока с ```json ... ```
+        # Попытка извлечь JSON из блока ```json
         if "```json" in response:
             try:
                 json_block = re.search(r"```json(.*?)```", response, re.DOTALL)
@@ -71,7 +71,7 @@ class DeepseekClient:
             except Exception as e:
                 logger.error("Ошибка при разборе JSON из блока: %s", e)
 
-        # Если не нашли через блок, ищем все объекты JSON в ответе
+        # Если не нашли через блок, ищем все объекты JSON в тексте
         if not json_candidates:
             matches = re.findall(r'(\{.*?\})', response, re.DOTALL)
             for candidate in matches:
@@ -91,7 +91,8 @@ class DeepseekClient:
         if not selected_command:
             selected_command = {"command": "unknown", "arguments": {}}
 
-        # Если команда unknown, или если команда get_contact_info, но contact_name недостаточно полное – выполняем фолбэк.
+        # -- ФОЛБЭК: если команда unknown ИЛИ имя оказалось коротким для get_contact_info
+        #    (меньше 2 слов), то пытаемся сами извлечь имя и метку.
         if selected_command.get("command") == "unknown" or (
                 selected_command.get("command") == "get_contact_info" and
                 len(selected_command.get("arguments", {}).get("contact_name", "").split()) < 2
@@ -99,27 +100,36 @@ class DeepseekClient:
             lower_text = user_text.lower()
             # Удаляем знаки препинания
             lower_text_clean = re.sub(r"[^\w\s]", "", lower_text)
-            # Пытаемся извлечь полное имя (минимум два слова) после ключевых слов "номер", "телефон" или "контакт"
-            multi_name_match = re.search(
-                r"\b(?:номер|телефон|контакт)\s+((?:[а-яё]+\s+){1,}[а-яё]+)",
-                lower_text_clean
-            )
+
+            # 1) Сначала попытаемся вытащить метку "из ..." или "по ..."
+            label_match = re.search(r"(?:из|по)\s+([а-яё]+)", lower_text_clean)
+            label = label_match.group(1).strip() if label_match else ""
+
+            # 2) Парсим имя после ключевых слов "номер", "телефон" или "контакт",
+            #    но останавливаемся, если натыкаемся на "из" или "по".
+            #    Пример: "дай номер антона из челгу" => contact_name = "антона"
+            multi_name_pattern = r"\b(?:номер|телефон|контакт)\s+((?:[а-яё]+)(?:\s+(?!из|по)[а-яё]+)*)"
+            multi_name_match = re.search(multi_name_pattern, lower_text_clean)
             if multi_name_match:
                 full_name = multi_name_match.group(1).strip()
             else:
-                # Если не нашли полное имя, попробуем одно слово
+                # Если не нашли несколько слов, пробуем хотя бы одно
                 single_name_match = re.search(r"(?:номер|телефон|контакт)\s+([а-яё]+)", lower_text_clean)
                 full_name = single_name_match.group(1).strip() if single_name_match else ""
-            # Также пытаемся извлечь метку (например, "из" или "по")
-            label_match = re.search(r"(?:из|по)\s+([а-яё]+)", lower_text_clean)
-            label = label_match.group(1).strip() if label_match else ""
-            selected_command = {
-                "command": "get_contact_info",
-                "arguments": {
-                    "contact_name": full_name,
-                    "field": "phone",
-                    "label": label,
-                    "multiple": False
+
+            # Если совсем ничего не нашли, оставляем unknown
+            if not full_name:
+                selected_command = {"command": "unknown", "arguments": {}}
+            else:
+                # Составляем нужную структуру
+                selected_command = {
+                    "command": "get_contact_info",
+                    "arguments": {
+                        "contact_name": full_name,
+                        "field": "phone",
+                        "label": label,
+                        "multiple": False
+                    }
                 }
-            }
+
         return selected_command
